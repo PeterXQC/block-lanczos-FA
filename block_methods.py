@@ -3,11 +3,11 @@ import scipy as sp
 import matplotlib.pyplot as plt
 
 def randHerm(n, d):
-    A = np.random.rand(n, d*n)
+    A = np.random.randn(n, d*n)
     return (A@A.T)/n
 
 def randVec(n, b = 1):
-    return np.random.rand(n, b)
+    return np.random.randn(n, b)
 
 def block_lanczos(H,V,k,reorth = 0):
     """
@@ -263,7 +263,7 @@ def mkplt(H, V, itr, b, f):
     
     Returns
     -------
-    return the plot
+    return the error and prints out the plot
     
     """
     Q, Qkp1, M, B = block_lanczos(H, V, itr, itr+1)
@@ -277,5 +277,8 @@ def mkplt(H, V, itr, b, f):
     for j in x:
         approx = makeApproximation(Q[:,:j*b], T[0:j*b, 0:j*b], f, B, b, j)
         error[j-1] = np.linalg.norm(approx-real)
-
-    return plt.plot(x, error)
+    
+    plt.plot(x, error)
+    plt.yscale("log")
+    
+    return error
