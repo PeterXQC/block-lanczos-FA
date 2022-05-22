@@ -28,7 +28,12 @@ def block_lanczos(H,V,k,reorth = 0):
     """
 
     Z = np.copy(V)
-    d,b = Z.shape
+    
+    d = Z.shape[0]
+    if np.shape(Z.shape)[0] == 1:
+         b = 1
+    else:
+        b = Z.shape[1]
     
     A = [np.zeros((b,b),dtype=H.dtype)] * k
     B = [np.zeros((b,b),dtype=H.dtype)] * (k+1)
