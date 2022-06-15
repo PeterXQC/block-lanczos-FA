@@ -68,6 +68,7 @@ def block_lanczos(H,V,k,reorth = 0):
 
     return Q1k, Qkp1, A, B
 
+
 def get_block_tridiag(A,B):
     """
     Input
@@ -75,6 +76,7 @@ def get_block_tridiag(A,B):
     
     A  : diagonal blocks
     B  : off diagonal blocks
+        Without the first block B[0].
     
     Returns
     -------
