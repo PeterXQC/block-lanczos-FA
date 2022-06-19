@@ -104,7 +104,7 @@ def Ei(n, b, i):
     """
     
     if (i == 0 or i > n/b):
-        raise ValueError("Illegal Index")
+        raise ValueError("Illegal Index: ", i, n, b, n/b)
 
     Ei = np.zeros((n,b))
     Ei[(i-1)*b:i*b,:] = np.identity(b)
