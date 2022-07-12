@@ -159,3 +159,101 @@ def get_CwinvCz(Eval,Evec,z,w,b,B_0):
     CwinvCz = np.linalg.solve(Cw,Cz)
     
     return CwinvCz
+
+def oscTest(H, w):
+    HwI = H-w*np.identity(np.shape(H)[0])
+    EvalH, EvecH = np.linalg.eigh(H)
+    
+    for i in np.arange(len(EvalH)):
+        if EvalH[i] <= 0:
+            print("Oscilitory behavior is expected for this pair of H and w.")
+            return False
+    
+    return True
+
+def Q_wz(w,z,lmin,lmax):
+    """
+    max_{x\in[lmin,lmax]} |x-w|/|z-w|
+    """
+    
+    if np.real(z) - w != 0:
+        b_hat = ( np.abs(z)**2 - np.real(z)*w ) / (np.real(z) - w)
+    else:
+        b_hat = np.inf
+    
+    if lmin < b_hat <= lmax:
+        return np.abs((z-w)/np.imag(z))
+    else:
+        return np.max([np.abs((lmax-w)/(lmax-z)), np.abs((lmin-w)/(lmin-z))])
+    
+def block_a_posteriori_bound(H, V, Q, T, f,gamma,endpts,w,lmin,lmax, k, B_0):
+    """
+    (1/2pi) \oint_{\Gamma} |f(z)| |D_{k,w,z}| Q_{w,z} |dz|
+    """
+    Eval, Evec = np.linalg.eigh(T)
+    def F(t):
+        z,dz = gamma(t)
+        
+        return (1/(2*np.pi)) * np.abs(f(z)) * np.linalg.norm(get_CwinvCz(Eval,Evec,z,w,np.shape(B_0)[0],B_0), ord = 2) * Q_wz(w,z,lmin,lmax) * np.abs(dz)
+    
+    integral = sp.integrate.quad(F,endpts[0],endpts[1],epsabs=0,limit=200) 
+    
+    return integral[0]*np.linalg.norm(exact_err(w, H, V, Q, T, B_0), ord = 2)
+
+def block_a_posteriori_bound_mid(T, f, gamma, endpts, Q, H, V, B_0):
+    """
+    (1/2pi) \oint_{\Gamma} |f(z)| |D_{k,w,z}| Q_{w,z} |dz|
+    """
+    
+    Eval, Evec = np.linalg.eigh(T)
+    def F(t):
+        z,dz = gamma(t)
+        
+        return (1/(2*np.pi)) * np.linalg.norm(f(z)* exact_err(z, H, V, Q, T, B_0), ord = 2) * np.abs(dz)
+    
+    integral = sp.integrate.quad(F,endpts[0],endpts[1],epsabs=0,limit=200)
+    
+    return integral[0]
+
+def block_a_posteriori_bound_exact(T, f, H, V, Q, B_0, b):
+    EvalH, EvecH = np.linalg.eigh(H)
+    fEvalH = f(EvalH)
+    fH = EvecH@np.diag(fEvalH)@EvecH.conj().T
+    
+    fHV = fH@V
+    
+    EvalT, EvecT = np.linalg.eigh(T)
+#     EvalT may be negative, and np.sqrt only let imaginary output when input is complex
+#     thus, we make first element of EvalT complex first. 
+    EvalT = EvalT.astype(complex)
+    EvalT[0] = EvalT[0]+0j
+    
+    fEvalT = f(EvalT)
+    fT = EvecT@np.diag(fEvalT)@EvecT.conj().T
+    
+    return np.linalg.norm(fHV-(Q@fT)[:, :b]@B_0, ord = 2)
+
+# use linear solver as oppose to get inverse
+def exact_err(z, H, V, Q, T, B_0):
+    Hinv = 1/(np.diag(H)-z)
+#     HinvV2 = Hinv*V
+    
+#     NOTE: apparently this implementation further tanks performance as its nolonger "vectorized".
+#     Below is the new way of computing HinvV for better compatibility with block size larger than 1.
+#     Above commented out was the old code that only works with block size 1
+#     this if statement checks if V is 1d, aka block size = 1. If true, reshape to 2D format for compatibility
+    this_V = V
+    if (np.shape(np.shape(this_V))[0] == 1): 
+        this_V = np.reshape(this_V, (len(this_V), 1))
+        
+    HinvV = np.zeros(np.shape(this_V),dtype = 'complex_')
+    for i in np.arange(np.shape(this_V)[1]):
+        HinvV[:, i] = Hinv*this_V[:, i]
+    
+#     due to mismatched shape, we do transpose
+    HinvV = HinvV.T
+
+    E1 = Ei(np.shape(T)[0], np.shape(B_0)[0], 1)
+    TinvE = np.linalg.solve((T-z*np.eye(T.shape[0])), E1)
+
+    return HinvV.T - Q@TinvE@B_0
